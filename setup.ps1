@@ -1,4 +1,4 @@
-# Script de Automacao - SSH Git + Node.js + Claude Code
+# Script de Automacao - SSH Git + Node.js + Python + Claude Code
 # Executar como Administrador
 # Salvar como UTF-8 com BOM
 
@@ -91,7 +91,7 @@ Read-Host "Pressione Enter apos adicionar a chave ao GitHub..."
 # 2. INSTALACAO DO NODE.JS E CLAUDE CODE
 # ============================================
 Write-Host ""
-Write-Host "Etapa 2: Verificando e Instalando Node.js e Claude Code" -ForegroundColor Yellow
+Write-Host "Etapa 2: Verificando e Instalando Node.js" -ForegroundColor Yellow
 
 # --- Verificacao e Instalacao do Node.js ---
  $nodeCommand = Get-Command node -ErrorAction SilentlyContinue
@@ -144,8 +144,6 @@ if (-not $nodeCommand -or $nodeVersion -lt $minRecommendedVersion) {
 Write-Host ""
 Write-Host "Instalando Claude Code globalmente..." -ForegroundColor Cyan
 
-# O comando npm agora deve estar disponivel, mesmo que o Node.js tenha sido instalado agora.
-# O novo processo lancado pelo npm herdara o PATH atualizado do sistema.
 npm install -g @anthropic-ai/claude-code
 
 if ($?) {
@@ -157,10 +155,65 @@ if ($?) {
 }
 
 # ============================================
-# 3. CONFIGURACAO DE VARIAVEIS DE AMBIENTE
+# 3. INSTALACAO DO PYTHON
 # ============================================
 Write-Host ""
-Write-Host "Etapa 3: Configurando Variaveis de Ambiente" -ForegroundColor Yellow
+Write-Host "Etapa 3: Verificando e Instalando Python" -ForegroundColor Yellow
+
+# --- Verificacao e Instalacao do Python ---
+ $pythonCommand = Get-Command python -ErrorAction SilentlyContinue
+ $pythonVersion = $null
+if ($pythonCommand) {
+    # `python --version` outputs to stderr, so we redirect it
+    $versionString = & python --version 2>&1
+    if ($versionString -match "Python (\d+\.\d+\.\d+)") {
+        $pythonVersion = [version]$matches[1]
+        Write-Host "[OK] Python encontrado. Versao atual: $versionString" -ForegroundColor Green
+    }
+} else {
+    Write-Host "[!] Python (comando 'python') nao encontrado." -ForegroundColor Yellow
+}
+
+# Definir versao minima recomendada
+ $minPythonVersion = [version]"3.8.0"
+
+if (-not $pythonCommand -or $pythonVersion -lt $minPythonVersion) {
+    Write-Host "[!] Python nao esta instalado ou a versao e muito antiga." -ForegroundColor Yellow
+    Write-Host "    Versao minima recomendada: $minPythonVersion" -ForegroundColor Cyan
+    Write-Host "    Iniciando instalacao automatica da versao mais recente..." -ForegroundColor Cyan
+
+    # URL do instalador mais recente do Python 3 (64-bit)
+    $pythonUrl = "https://www.python.org/ftp/python/3.12.4/python-3.12.4-amd64.exe"
+    $installerPath = "$env:TEMP\python-installer.exe"
+
+    try {
+        Write-Host "    Baixando o instalador do Python..." -ForegroundColor Cyan
+        Invoke-WebRequest -Uri $pythonUrl -OutFile $installerPath -UseBasicParsing
+        
+        Write-Host "    Instalando Python de forma silenciosa (isso pode levar alguns minutos)..." -ForegroundColor Cyan
+        # Argumentos: /quiet (silencioso), InstallAllUsers=1 (para todos usuarios), PrependPath=1 (adiciona ao PATH), Include_test=0 (nao instala testes)
+        $process = Start-Process -FilePath $installerPath -ArgumentList "/quiet", "InstallAllUsers=1", "PrependPath=1", "Include_test=0" -Wait -PassThru -NoNewWindow
+
+        if ($process.ExitCode -eq 0) {
+            Write-Host "[OK] Python instalado com sucesso!" -ForegroundColor Green
+            # Limpar o instalador
+            Remove-Item $installerPath -ErrorAction SilentlyContinue
+        } else {
+            Write-Host "[X] Falha na instalacao do Python. Codigo de saida: $($process.ExitCode)" -ForegroundColor Red
+            Write-Host "    Verifique o log de eventos do Windows para mais detalhes." -ForegroundColor Yellow
+            # Nao vamos fazer 'exit 1' aqui para nao bloquear o resto do script, mas e bom avisar.
+        }
+    } catch {
+        Write-Host "[X] Ocorreu um erro ao baixar ou instalar o Python." -ForegroundColor Red
+        Write-Host "    Erro: $($_.Exception.Message)" -ForegroundColor Yellow
+    }
+}
+
+# ============================================
+# 4. CONFIGURACAO DE VARIAVEIS DE AMBIENTE
+# ============================================
+Write-Host ""
+Write-Host "Etapa 4: Configurando Variaveis de Ambiente" -ForegroundColor Yellow
 
 # Configurar API Key e Base URL (Z.ai GLM)
 Write-Host "Configurando API Key e Base URL para Z.ai GLM..." -ForegroundColor Cyan
@@ -201,6 +254,7 @@ Write-Host ""
 Write-Host "Resumo:" -ForegroundColor Cyan
 Write-Host "  [OK] Chave SSH configurada: $sshKeyPath" -ForegroundColor White
 Write-Host "  [OK] Node.js instalado/atualizado" -ForegroundColor White
+Write-Host "  [OK] Python instalado/atualizado" -ForegroundColor White
 Write-Host "  [OK] Claude Code instalado" -ForegroundColor White
 Write-Host "  [OK] API Key Z.ai configurada" -ForegroundColor White
 Write-Host "  [OK] Base URL Z.ai configurada" -ForegroundColor White
@@ -211,9 +265,10 @@ Write-Host "  - API Provider: Z.ai GLM" -ForegroundColor White
 Write-Host "  - Base URL: https://api.z.ai/api/anthropic" -ForegroundColor White
 Write-Host ""
 Write-Host "Proximos passos:" -ForegroundColor Yellow
-Write-Host "  1. Reinicie o terminal para carregar as variaveis de ambiente" -ForegroundColor White
+Write-Host "  1. **REINICIE O TERMINAL** para carregar todas as variaveis de ambiente e o PATH." -ForegroundColor White
 Write-Host "  2. Teste a chave SSH: ssh -T git@github.com" -ForegroundColor White
 Write-Host "  3. Execute o Claude Code: claude" -ForegroundColor White
+Write-Host "  4. Verifique as versoes: node -v e python --version" -ForegroundColor White
 Write-Host ""
 Write-Host "Documentacao do Claude Code: https://docs.claude.com/en/docs/claude-code" -ForegroundColor Cyan
 Write-Host ""
